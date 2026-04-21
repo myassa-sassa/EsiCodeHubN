@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test d'upload - API Node.js</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            background: #f9f9f9;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+
+        .result.loading {
+            background: #e2e3e5;
+            border: 1px solid #d6d8db;
+            color: #383d41;
+            display: block;
+        }
+
+        .preview {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .preview h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .file-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #667eea;
+            color: white;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📤 Test d'upload</h1>
+        <p class="subtitle">API Node.js + PostgreSQL</p>
+
+        <form id="uploadForm">
+            <div class="form-group">
+                <label>📁 Fichier</label>
+                <input type="file" id="file" name="files" required>
+                <div class="file-info" id="fileInfo"></div>
+            </div>
+
+            <div class="form-group">
+                <label>👤 ESI ID (numéro étudiant)</label>
+                <input type="number" id="esi_id" placeholder="Ex: 31731309" required value="31731309">
+            </div>
+
+            <div class="form-group">
+                <label>📚 Module ID</label>
+                <input type="number" id="module_id" placeholder="Ex: 1" required value="1">
+            </div>
+
+            <div class="form-group">
+                <label>📝 Description</label>
+                <input type="text" id="content" placeholder="Description de votre soumission">
+            </div>
+
+            <div class="form-group">
+                <label>🔤 Langage</label>
+                <select id="language">
+                    <option value="html">HTML</option>
+                    <option value="css">CSS</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="c">C</option>
+                    <option value="java">Java</option>
+                </select>
+            </div>
+
+            <button type="submit">🚀 Uploader le fichier</button>
+        </form>
+
+        <div id="result" class="result"></div>
+        <div id="preview" class="preview"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('file');
+        const fileInfo = document.getElementById('fileInfo');
+        const resultDiv = document.getElementById('result');
+        const previewDiv = document.getElementById('preview');
+
+        // Afficher les infos du fichier sélectionné
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const sizeKB = (file.size / 1024).toFixed(2);
+                const sizeMB = (sizeKB / 1024).toFixed(2);
+                const sizeDisplay = sizeMB > 1 ? `${sizeMB} MB` : `${sizeKB} KB`;
+                
+                fileInfo.innerHTML = `
+                    ✅ Fichier sélectionné: <strong>${file.name}</strong> 
+                    (${sizeDisplay}) <span class="badge">${file.type || 'unknown'}</span>
+                `;
+                
+                // Prévisualisation pour les fichiers texte
+                if (file.type === 'text/html' || file.name.endsWith('.html')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        previewDiv.style.display = 'block';
+                        previewDiv.innerHTML = `
+                            <h3>📄 Aperçu du fichier:</h3>
+                            <pre style="background:#f5f5f5;padding:10px;border-radius:5px;font-size:11px;overflow-x:auto;max-height:200px;">${e.target.result.substring(0, 500)}${e.target.result.length > 500 ? '...' : ''}</pre>
+                        `;
+                    };
+                    reader.readAsText(file);
+                } else {
+                    previewDiv.style.display = 'none';
+                }
+            } else {
+                fileInfo.innerHTML = '';
+                previewDiv.style.display = 'none';
+            }
+        });
+
+        // Upload du fichier
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const file = fileInput.files[0];
+            if (!file) {
+                showResult('Veuillez sélectionner un fichier', 'error');
+                return;
+            }
+
+            const esi_id = document.getElementById('esi_id').value;
+            const module_id = document.getElementById('module_id').value;
+            const content = document.getElementById('content').value;
+            const language = document.getElementById('language').value;
+
+            // Créer FormData
+            const formData = new FormData();
+            formData.append('files', file);
+            formData.append('esi_id', esi_id);
+            formData.append('module_id', module_id);
+            if (content) formData.append('content', content);
+            formData.append('language', language);
+
+            // Afficher le chargement
+            showResult('⏳ Upload en cours...', 'loading');
+
+            try {
+                const response = await fetch('http://localhost:3000/api/upload/files', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                console.log('Réponse:', data);
+
+                if (response.ok && data.success) {
+                    showResult(`
+                        ✅ <strong>Upload réussi !</strong><br>
+                        📝 ID de soumission: ${data.submission_id}<br>
+                        📁 Fichier: ${file.name}<br>
+                        👤 ESI ID: ${esi_id}<br>
+                        📚 Module ID: ${module_id}
+                    `, 'success');
+                } else {
+                    showResult(`❌ Erreur: ${data.message || 'Erreur inconnue'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                showResult(`❌ Erreur de connexion: ${error.message}<br>Vérifiez que le serveur est démarré (npm run dev)`, 'error');
+            }
+        });
+
+        function showResult(message, type) {
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = message;
+            
+            if (type !== 'loading') {
+                setTimeout(() => {
+                    if (resultDiv.className !== 'result loading') {
+                        resultDiv.style.opacity = '0';
+                        setTimeout(() => {
+                            resultDiv.style.display = 'none';
+                            resultDiv.style.opacity = '1';
+                        }, 500);
+                    }
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>
